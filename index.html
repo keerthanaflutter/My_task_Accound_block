@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Delete Your Account — My Task</title>
+  <meta name="description" content="Delete your My Task account and the data associated with it.">
+  <style>
+    :root {
+      --bg: #f5f6f8; --card: #ffffff; --text: #1a1d23; --muted: #5f6673;
+      --border: #d9dde3; --danger: #c62828; --danger-text: #ffffff;
+      --ok-bg: #e7f5ea; --ok: #1e6b34; --err-bg: #fdecec;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111317; --card: #1b1e24; --text: #eceef2; --muted: #a3a9b4;
+        --border: #333842; --danger: #ef5350; --danger-text: #111317;
+        --ok-bg: #16301f; --ok: #8fd6a3; --err-bg: #3a1c1c;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 560px; margin: 0 auto; padding: 32px 16px 48px; }
+    h1 { font-size: 1.6rem; margin: 0 0 8px; }
+    h2 { font-size: 1.05rem; margin: 24px 0 8px; }
+    p, li { color: var(--muted); }
+    ul { padding-left: 20px; margin: 0; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px; margin-top: 24px;
+    }
+    label { display: block; font-size: 0.9rem; margin: 12px 0 4px; }
+    input {
+      width: 100%; padding: 10px 12px; font: inherit; color: var(--text);
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    }
+    .check { display: flex; gap: 8px; align-items: flex-start; margin-top: 16px; }
+    .check input { width: auto; margin-top: 4px; }
+    .check label { margin: 0; color: var(--text); }
+    button {
+      width: 100%; margin-top: 20px; padding: 12px; font: inherit; font-weight: 600;
+      color: var(--danger-text); background: var(--danger); border: 0; border-radius: 8px; cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; cursor: default; }
+    .msg { margin-top: 16px; padding: 12px; border-radius: 8px; display: none; }
+    .msg.error { display: block; background: var(--err-bg); color: var(--danger); }
+    .msg.ok { display: block; background: var(--ok-bg); color: var(--ok); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Delete your My Task account</h1>
+  <p>Sign in below to permanently delete your account. You can also do this in the app:
+    <strong>Profile → Delete account</strong>.</p>
+
+  <h2>What is deleted</h2>
+  <ul>
+    <li>Your name, email address, phone number and password</li>
+    <li>Tasks you created</li>
+    <li>Your direct messages, notifications and accepted invites</li>
+  </ul>
+
+  <h2>What is kept</h2>
+  <ul>
+    <li>Tasks other people assigned to you stay with their creator; you are removed from them.</li>
+    <li>Messages you wrote on other people's tasks stay, shown as "Deleted user".</li>
+  </ul>
+  <p>Deletion takes effect immediately and cannot be undone. You can sign up again later with the same email as a new account.</p>
+  <p>Company accounts are managed by your organisation — please ask your administrator to delete them.</p>
+
+  <form class="card" id="form" novalidate>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" required>
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <div class="check">
+      <input id="confirm" type="checkbox">
+      <label for="confirm">I understand this permanently deletes my account and my tasks.</label>
+    </div>
+    <button id="submit" type="submit">Delete my account</button>
+    <div id="msg" class="msg" role="status" aria-live="polite"></div>
+  </form>
+</main>
+<script>
+  // Same backend as lib/core/config/api_config.dart.
+  const API = 'https://sdec-erp-backend-8xc9.onrender.com/api';
+
+  const $ = (id) => document.getElementById(id);
+  const show = (text, kind) => { $('msg').textContent = text; $('msg').className = 'msg ' + kind; };
+
+  async function call(path, method, body, token) {
+    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    const res = await fetch(API + path, { method, headers, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    return { status: res.status, data };
+  }
+
+  $('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('email').value.trim();
+    const password = $('password').value;
+    if (!email || !password) return show('Enter your email and password.', 'error');
+    if (!$('confirm').checked) return show('Tick the box to confirm.', 'error');
+
+    $('submit').disabled = true;
+    show('Deleting…', 'ok');
+    try {
+      const login = await call('/auth/login', 'POST', { email, password });
+      if (login.status === 401) return show('Invalid email or password.', 'error');
+      if (!login.data.token) return show(login.data.error || login.data.message || 'Sign-in failed. Please try again.', 'error');
+
+      const del = await call('/auth/account', 'DELETE', { password }, login.data.token);
+      if (del.status === 200) {
+        $('form').reset();
+        return show('Your account has been deleted.', 'ok');
+      }
+      show(del.data.error || del.data.message || 'Failed to delete account. Please try again.', 'error');
+    } catch (_) {
+      show('Could not reach the server. Check your connection and try again.', 'error');
+    } finally {
+      $('submit').disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
