@@ -119,11 +119,11 @@ class AppColors extends ThemeExtension<AppColors> {
   );
 
   static const light = AppColors(
-    background: Color(0xFFF7F8FA),
+    background: Color(0xFFF6F7FB),
     cardBackground: Colors.white,
     secondaryBackground: Color(0xFFEFF1F5),
     divider: Color(0xFFE4E7EC),
-    primary: Color(0xFF2563EB),
+    primary: Color(0xFF4F46E5),
     textPrimary: Color(0xFF101828),
     textSecondary: Color(0xFF667085),
     success: Color(0xFF039855),
